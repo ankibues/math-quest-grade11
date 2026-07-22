@@ -82,7 +82,7 @@ export default function Home() {
   const [note, setNote] = useState("");
   const [showHint, setShowHint] = useState(false);
   const [checked, setChecked] = useState(false);
-  const [error, setError] = useState("");
+  const [attemptedCheck, setAttemptedCheck] = useState(false);
   const q = questions[index];
 
   const topicResults = useMemo(() => topics.map(topic => {
@@ -94,18 +94,23 @@ export default function Home() {
 
   function start() { setScreen("quiz"); }
   function check() {
-    if (choice === null || confidence === null) { setError("Choose an idea and your confidence before checking."); return; }
+    setAttemptedCheck(true);
+    if (choice === null || confidence === null) {
+      const firstMissing = choice === null ? "answer-choices" : "confidence-choice";
+      window.setTimeout(() => document.getElementById(firstMissing)?.scrollIntoView({ behavior: "smooth", block: "center" }), 40);
+      return;
+    }
     setResponses(prev => ({ ...prev, [index]: { choice, confidence, note } }));
-    setError(""); setChecked(true);
+    setChecked(true);
   }
   function advance() {
     if (index === questions.length - 1) { setScreen("results"); return; }
     const next = index + 1;
     const saved = responses[next];
-    setIndex(next); setChoice(saved?.choice ?? null); setConfidence(saved?.confidence ?? null); setNote(saved?.note ?? ""); setChecked(false); setShowHint(false); setError("");
+    setIndex(next); setChoice(saved?.choice ?? null); setConfidence(saved?.confidence ?? null); setNote(saved?.note ?? ""); setChecked(false); setShowHint(false); setAttemptedCheck(false);
   }
   function restart() {
-    setResponses({}); setIndex(0); setChoice(null); setConfidence(null); setNote(""); setChecked(false); setShowHint(false); setScreen("welcome");
+    setResponses({}); setIndex(0); setChoice(null); setConfidence(null); setNote(""); setChecked(false); setShowHint(false); setAttemptedCheck(false); setScreen("welcome");
   }
 
   if (screen === "welcome") return <Welcome onStart={start} />;
@@ -126,17 +131,16 @@ export default function Home() {
             <div className="qmeta"><span>Investigation {String(index + 1).padStart(2, "0")}</span>{q.skill}</div>
             <h2 className="prompt">{q.prompt}</h2><p className="scenario">{q.context}</p>
             <div className="thinking-line" aria-hidden="true"><span /><span /><span /><span /></div>
-            <div className="choices" role="radiogroup" aria-label="Reasoning choices">{q.choices.map((text, i) => <button key={text} className={`choice ${choice === i ? "selected" : ""} ${checked && i === q.answer ? "correct" : ""} ${checked && choice === i && i !== q.answer ? "incorrect" : ""}`} role="radio" aria-checked={choice === i} disabled={checked} onClick={() => { setChoice(i); setError(""); }}><span className="letter">{String.fromCharCode(65 + i)}</span><span>{text}</span></button>)}</div>
+            <div id="answer-choices" className={`required-field ${attemptedCheck && choice === null ? "needs-attention" : ""}`}><div className="field-heading"><span>Choose the idea you trust most</span><span className="required-tag">Required</span></div><div className="choices" role="radiogroup" aria-label="Reasoning choices" aria-describedby={attemptedCheck && choice === null ? "answer-needed" : undefined}>{q.choices.map((text, i) => <button key={text} className={`choice ${choice === i ? "selected" : ""} ${checked && i === q.answer ? "correct" : ""} ${checked && choice === i && i !== q.answer ? "incorrect" : ""}`} role="radio" aria-checked={choice === i} disabled={checked} onClick={() => setChoice(i)}><span className="letter">{String.fromCharCode(65 + i)}</span><span>{text}</span></button>)}</div>{attemptedCheck && choice === null && <p id="answer-needed" className="field-error" role="alert">Select one answer before checking your reasoning.</p>}</div>
             {checked && <div className={`feedback ${choice === q.answer ? "success" : "review"}`} role="status"><strong>{choice === q.answer ? "Your reasoning holds up." : "A useful place to pause."}</strong><p>{q.why}</p></div>}
           </article>
           <aside className="thinking-card">
             <span className="lab-tag">Your field notes</span><h2>What makes you say that?</h2><p>Choose the idea you trust most, then name how certain you feel. Confidence helps distinguish a gap from a lucky guess.</p>
-            <div className="confidence-label">How confident are you right now?</div><div className="confidence">{["Still testing", "Fairly sure", "Certain"].map((label, i) => <button key={label} disabled={checked} className={`conf ${confidence === i + 1 ? "selected" : ""}`} onClick={() => { setConfidence(i + 1); setError(""); }}>{label}</button>)}</div>
+            <div id="confidence-choice" className={`required-field confidence-field ${attemptedCheck && confidence === null ? "needs-attention" : ""}`}><div className="confidence-label">How confident are you right now? <span className="required-tag">Required</span></div><div className="confidence" role="radiogroup" aria-label="Confidence" aria-describedby={attemptedCheck && confidence === null ? "confidence-needed" : undefined}>{["Still testing", "Fairly sure", "Certain"].map((label, i) => <button key={label} role="radio" aria-checked={confidence === i + 1} disabled={checked} className={`conf ${confidence === i + 1 ? "selected" : ""}`} onClick={() => setConfidence(i + 1)}>{label}</button>)}</div>{attemptedCheck && confidence === null && <p id="confidence-needed" className="field-error" role="alert">Choose the confidence level that feels closest.</p>}</div>
             <div className="note"><label htmlFor="why">One sentence of reasoning <small>(optional)</small></label><textarea id="why" disabled={checked} value={note} onChange={e => setNote(e.target.value)} placeholder="I notice that…" /></div>
             <button className="hint" type="button" aria-expanded={showHint} onClick={() => setShowHint(v => !v)}>{showHint ? "Hide thinking nudge" : "Reveal a thinking nudge"}</button>
             {showHint && <div className="hint-box">{q.hint}</div>}
-            {error && <p className="error" role="alert">{error}</p>}
-            <div className="actions">{!checked ? <button className="continue" onClick={check}>Check my reasoning →</button> : <button className="continue" onClick={advance}>{index === questions.length - 1 ? "See my review map →" : "Next investigation →"}</button>}</div>
+            <div className="actions">{!checked ? <button className="continue" onClick={check}>{attemptedCheck && (choice === null || confidence === null) ? "Complete the highlighted step" : "Check my reasoning →"}</button> : <button className="continue" onClick={advance}>{index === questions.length - 1 ? "See my review map →" : "Next investigation →"}</button>}</div>
             <div className="footer-note">No grades. Your responses only shape a suggested review path.</div>
           </aside>
         </section>
